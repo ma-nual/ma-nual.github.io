@@ -71,22 +71,25 @@ const char arr[]="hello"; //这里hello本来是在栈上的，但是编译器�
 const char *arr2="hello"; //字符串hello保存在常量区，const本来是修饰arr2指向的值不能通过arr2去修改，但是字符串hello在常量区，本来就不能改变，所以加不加const效果都一样
 ```
 
-### 5. 函数指针
+### 5. 函数指针与指针函数
 
 **含义：**
 
-函数指针是**指向函数的指针变量**。C++在编译时，每一个函数都有一个入口地址，该入口地址就是函数指针所指向的地址。
+**函数指针**`int (*f)(int x)`是**指向函数入口地址的指针变量**。C++在编译时，每一个函数都有一个入口地址，该入口地址就是函数指针所指向的地址。
+
+**指针函数**`int* f(int x, int y)`是**返回值是指针的函数**
 
 **声明方式：**
 
 ```c++
 int func(int a); //声明一个函数
 int (*f) (int a); //声明一个函数指针
+int *f1(int a); //声明一个指针函数
 ```
 
-上述的`f`就是一个函数指针，它指向所有返回类型为int，并带有一个int参数的函数，注意括号是一定要有的，否则上述定义就变成了声明一个函数`f`，其返回类型是int *，带有一个int参数
+上述的`f`就是一个函数指针，它指向所有返回类型为int，并带有一个int参数的函数
 
-**赋值方法：**
+**函数指针的赋值方法：**
 
 ```c++
 f = &func; //指针名 = &函数名
@@ -95,7 +98,7 @@ f = func; //指针名 = 函数名
 
 将`func`函数的首地址赋值给函数指针，赋值时函数不带括号，也不带参数，**函数名就代表了函数的首地址**。
 
-**调用方法：**
+**函数指针的调用方法：**
 
 ```c++
 #include <iostream>
@@ -121,7 +124,7 @@ int main(){
 }
 ```
 
-有了指向函数的指针变量后，就可以实现用该指针变量使用相同参数调用不同函数了。
+有了指向函数的指针变量后，就可以实现用该指针变量使用相同参数调用不同函数了，用于调用函数和回调函数
 
 ### 6. 引用和指针的区别
 
@@ -135,3 +138,159 @@ int main(){
   - 使用引用可能会导致实参随着形参的改变而改变，**声明为const之后就会消除这种副作用**。
 - **参数传递：** 作为参数传递时，指针是**间接传递**，指针需要被解引用才可以对对象进行操作，而引用是**直接传递**，直接对引用的修改都会改变引用所指向的对象。
 - **多级指针，一级引用：** 指针可以有多级指针（**p），而引用只有一级
+
+### 7. 如何判断大小端存储
+
+**大端字节序**是指一个整数的高位字节存放在内存的低地址处，低位字节存放在内存的高地址处
+
+**小端字节序**是指整数的高位字节存放在内存的内存的高地址处，低位字节存放在内存的低地址处
+
+大端字节序也成为**网络字节序**，当两台采用不同字节序的主机通信时，在发送数据之前发送端都必须经过字节序的转换成为大端字节序后再发送
+
+**判断方法：**
+
+```c++
+#include <iostream>
+
+using namespace std;
+
+union U{
+    int a;
+    char b;
+}; //在一个联合体里可以定义多种不同的数据类型，这些数据共享一段内存，在不同的时间里保存不同的数据类型和长度的变量，以达到节省空间的目的，但同一时间只能存储其中一个成员变量的值
+
+int main(){
+    U u;
+    u.a = 0x1234;
+    if(u.b == 0x12){
+        cout << "big endian" << endl;
+    }
+    else if(u.b == 0x34){
+        cout << "little endian" << endl;
+    }
+    return 0;
+}
+```
+
+### 8. 内存字节对齐的规则和原因
+
+#### 规则
+
+- 对于结构的各个成员，第一个成员位于偏移为0的位置，以后的每个数据成员的偏移量必须是`min(#pragma pack()指定的数,这个数据成员的自身长度)`的倍数
+- 在所有的数据成员完成各自对齐之后，结构或联合体本身也要进行对齐，对齐将按照 #pragam pack指定的数值和结构或者联合体最大数据成员长度中比较小的那个，也就是`min(#pragram pack() , 长度最长的数据成员)`
+
+#### 原因
+
+- **平台原因（移植原因）：** **不是所有的硬件平台都能访问任意地址上的任意数据**，某些硬件平台只能在某些地址处取某些特定类型的数据，否则抛出硬件异常
+- **硬件原因：** 经过内存对齐之后，**CPU的内存访问速度大大提升**。访问未对齐的内存，处理器要访问两次（数据先读高位，再读低位），访问对齐的内存，处理器只要访问一次，为了提高处理器读取数据的效率，我们使用内存对齐
+
+#### struct和union占用字节数的计算
+
+```c++
+//struct
+#include <cstdio>
+#include <iostream>
+using namespace std;
+
+struct E1 {
+	int a; char b; char c;
+}e1; //4 + 1 + 1 + 2 = 8
+
+struct E2 {
+	char b; int a; char c;
+}e2; //1 + 3 + 4 + 1 + 3 = 12
+
+struct B{
+    char a;
+    double b;
+    int c;
+}test_struct_b; //1 + 7 + 8 + 4 + 4 = 24
+
+struct E{
+
+}test_struct_e; //空结构体占用字节数为1，编译器默认分配了一个字节，为了确保两个不同对象的地址不同，带有虚函数的C++类大小不为1，因为每一个对象会有一个vptr指向虚函数表，具体大小根据指针大小确定
+
+int main() {
+	cout << sizeof(E1) << endl; //8
+	
+	cout << sizeof(E2) << endl; //12
+  
+  cout << sizeof(test_struct_b) << endl; //24
+  
+  cout << sizeof(test_struct_e) << endl; //1
+  
+	return 0;
+}
+
+//union
+#include <cstdio>
+#include <iostream>
+using namespace std;
+
+union A{
+    int a[5];
+    char b;
+    double c;
+}; //20 + 4 = 24
+
+int main() {
+  cout << sizeof(A) << endl; //24
+	return 0;
+}
+
+//混合结构体占用字节数
+#include <cstdio>
+#include <iostream>
+using namespace std;
+#define LL long long 
+
+struct E5 {
+	char a1,a2,a3,a4,a5,a6;
+}e5; //1 + 1 + 1 + 1 + 1 + 1 = 6
+struct E6 {
+	char a1,a2,a3;
+}e6; //1 + 1 + 1 = 3
+struct E7 {
+	struct E5 elem5;
+	struct E6 elem6;
+	LL a;
+}e7; //6 + 3 + 7 + 8 = 24
+
+struct E8 {
+	char a[9];
+}e8; //9
+struct E9 {
+	struct E8 elem8;
+	LL a;
+}e9; //9 + 7 + 8 = 24
+
+typedef union{
+    long i;
+    int k[5];
+    char c;
+}UDATA; //4 * 5 + 4 = 24
+
+struct C{
+    int cat;
+    UDATA cow;
+    double dog;
+}test_struct_c; //4 + 24 + 4 + 8 = 40
+
+UDATA temp;
+
+int main() {
+	cout << sizeof(E5) << endl; //6
+  
+	cout << sizeof(E6) << endl; //3
+  
+	cout << sizeof(E7) << endl; //24
+	
+	cout << sizeof(E8) << endl; //9
+  
+	cout << sizeof(E9) << endl; //24
+  
+  cout << sizeof(test_struct_c) + sizeof(temp) << endl; //40 + 24 = 64
+	return 0;
+}
+```
+
