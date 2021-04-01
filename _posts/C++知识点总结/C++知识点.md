@@ -1061,3 +1061,602 @@ void test01(){
 ### 类型兼容性原则，为什么会有多态
 
 类型兼容规则是指在需要基类对象的任何地方，都可以使用公有派生类的对象来替代，如使用子类对象可以直接赋值给父类对象或子类对象可以直接初始化父类对象时，**对于同样的一条语句，不管传入子类还是父类对象，都是调用的父类函数，但我们想实现的是同样的一条语句，传入不同的对象，调用不同的函数**，我们想**传入子类对象调用子类函数，传入父类对象调用父类函数**，即同样的调用语句有多种不同的表现形态，这样就出现了**多态**。
+
+### 构造函数可以抛出异常吗，有什么问题
+
+构造函数中应该避免抛出异常。
+
+- 构造函数中抛出异常后，对象的析构函数将不会被执行。
+
+- 构造函数抛出异常时，本应该在析构函数中被delete的对象没有被delete，会导致内存泄露。
+
+- 当对象发生部分构造时，已经构造完毕的子对象（非动态分配）将会逆序地被析构。
+
+### 初始化列表的异常怎么捕获
+
+- 初始化列表构造，当初始化列表出现异常时，程序还未进入函数体，因此函数体中的try-catch不能执行，catch也无法处理异常。可以通过函数try块解决该问题。
+- 函数try块中的try出现在表示构造函数初始值列表的冒号以及表示构造函数体的花括号之前，与这个try关联的catch既能处理构造函数体抛出的异常，也能处理成员初始化列表抛出的异常。
+
+### 析构函数可以抛出异常吗，有什么问题
+
+析构函数不应该抛出异常
+
+- **其他正常，仅析构函数异常**。 如果析构函数抛出异常，则异常点之后的程序不会执行，如果析构函数在异常点之后执行了某些必要的动作比如释放某些资源，则这些动作不会执行，会造成诸如资源泄漏的问题。
+
+- **其他异常，且析构函数异常**。 通常异常发生时，c++的机制会调用已经构造对象的析构函数来释放资源，此时若析构函数本身也抛出异常，则前一个异常尚未处理，又有新的异常，会造成程序崩溃的问题。
+
+### 析构函数如何处理异常
+
+- 若析构函数抛出异常，调用`std::abort()`来终止程序；
+- 在析构函数中catch捕获异常并作处理，吞下异常；
+- 如果客户需要对某个操作函数运行期间抛出的异常做出反应，class应该提供普通函数执行该操作，而非在析构函数中。
+
+### 智能指针
+
+C++中的智能指针有auto_ptr，shared_ptr，weak_ptr和unique_ptr。智能指针其实是将指针进行了封装，可以像普通指针一样进行使用，同时可以在函数结束时自动释放内存空间，不需要手动释放内存空间，避免忘记释放指针指向的内存地址或者在释放指针之前出错造成内存泄漏。
+
+发生情况有如下三种：
+
+**1.忘记释放不再使用的内存，造成内存泄漏**
+
+```c++
+int main(){
+  int *ptr = new int(1);
+  return 0;
+}
+```
+
+**2.最后释放了申请内存，但是会留下空悬指针（野指针）带来隐患**
+
+```c++
+int main(){
+  int *ptr = new int(1);
+  delete ptr;
+  //ptr = nullptr; //在释放内存后要将指针置为空
+}
+```
+
+**3.在new之后在对应的delete之前发生异常**
+
+```c++
+int main(){
+  int *ptr = new int(1);
+  //在此抛出一个异常，则内存不会被释放，可用try...catch...
+  delete ptr;
+}
+```
+
+#### auto_ptr
+
+auto_ptr是C++98的智能指针，C++11已经抛弃，auto_ptr在进行指针拷贝和赋值的时候，新指针直接接管旧指针的资源并且将旧指针指向空，但是这种方式在需要访问旧指针的时候，就会出现问题。
+
+```c++
+auto_ptr<string> p1(new string("I"));
+auto_ptr<string> p2;
+p2 = p1; //auto_ptr不会报错，p2剥夺了p1的所有权，但是需要访问p1时会出错
+```
+
+#### unique_ptr
+
+unique_ptr是auto_ptr的一个改良版，**不能赋值也不能拷贝**，当unique_ptr是一个临时右值可以赋值，避免了旧指针不再指向有效数据的问题，保证一个对象同一时间只有一个智能指针。
+
+```c++
+unique_ptr<string> p3(new string("auto"));
+unique_ptr<string> p4;
+p4 = p3; //此时会报错，避免了p3不再指向有效数据的问题
+
+unique_ptr<string> u1(new string("hello"));
+unique_ptr<string> u2;
+u2 = u1; //不允许，会留下悬挂的u1，unique_ptr不支持赋值
+unique_ptr<string> u3(u1); //错误：unique_ptr不支持拷贝
+unique_ptr<string> u4;
+u4 = unique_ptr<string>(new string("You")); //允许，构造函数创建的临时对象在其所有权给u4后就会被摧毁，不会留下悬挂的unique_ptr
+```
+
+#### shared_ptr
+
+shared_ptr可以使得一个对象可以有多个智能指针，当这个对象所有的智能指针被销毁时就会自动进行回收。对shared_ptr进行初始化时不能将一个普通指针直接赋值给智能指针，因为一个是指针，一个是类，可以直接初始化或者通过make_shared函数或者通过构造函数传入普通指针（内部使用计数机制进行维护）。不要把一个原生指针给多个shared_ptr，不要把this指针交给智能指针管理，这样会重复释放，**shared_ptr之间的资源共享是通过shared_ptr智能指针拷贝、赋值实现的**，因为这样可以引起计数器的更新；而如果直接通过原生指针来初始化，就会导致p1和p2都根本不知道对方的存在，然而却两者都管理同一块地方。
+
+```c++
+shared_ptr<int> p1 = new int(1024); //错误：必须使用直接初始化形式
+shared_ptr<int> p2(new int(1024)); //正确：使用了直接初始化形式
+shared_ptr<int> p3 = make_shared<int>(42);
+
+int* ptr = new int;
+shared_ptr<int> p1(ptr);
+shared_ptr<int> p2(ptr); //这样不会导致更新，两者不知对方存在
+shared_ptr<int> p3(p1);//这样才会导致计数器更新
+```
+
+#### weak_ptr
+
+weak_ptr是为了协助shared_ptr而出现的，它是一种不控制对象生命周期的智能指针，只是提供了对管理对象的一个访问手段，它指向一个shared_ptr管理的对象，只可以从一个shared_ptr或另一个weak_ptr对象构造，它的构造和析构不会引起引用计数的增加或减少，只能观测shared_ptr的引用计数，防止出现死锁。`expired()`用于检测所管理的对象是否已经释放；`lock()`用于获取所管理的对象的强引用指针，不能直接访问弱引用，需要将其先通过lock转换为强引用再访问。
+
+```c++
+auto p = make_shared<int>(42);
+weak_ptr<int> wp(p); //wp弱共享p，p的引用计数不改变
+```
+
+#### 循环引用
+
+当两个shared_ptr相互引用，会造成循环引用，那么这两个指针的引用计数不可能下降为0，资源不会释放，从而导致内存泄漏。
+
+```c++
+class B;
+
+class A{
+public:
+  A(){cout << "A()" << endl;}
+  A(int i):a(i){cout << "A(int)" << endl;}
+  ~A(){cout << "~A()" << endl;}
+  
+  shared_ptr<B> _bptr;
+  int a;
+};
+
+class B{
+public:
+  B(){cout << "B()" << endl;}
+  B(int i):b(i){cout << "B(int)" << endl;}
+  ~B(){cout << "~B()" << endl;}
+  
+  shared_ptr<A> _aptr;
+  int b;
+};
+
+int main(){
+  shared_ptr<A> aptr(new A(10));
+  shared_ptr<B> bptr(new B(10));
+  cout << aptr.use_count() << endl; //1
+  aptr -> _bptr = bptr;
+  bptr -> _aptr = aptr;
+  cout << aptr.use_count() << endl; //2
+  return 0;
+}
+```
+
+##### 解决方法
+
+使用weak_ptr解决循环引用。
+
+```c++
+class B;
+
+class A{
+public:
+  A(){cout << "A()" << endl;}
+  A(int i):a(i){cout << "A(int)" << endl;}
+  ~A(){cout << "~A()" << endl;}
+  
+  weak_ptr<B> _bptr;
+  int a;
+};
+
+class B{
+public:
+  B(){cout << "B()" << endl;}
+  B(int i):b(i){cout << "B(int)" << endl;}
+  ~B(){cout << "~B()" << endl;}
+  
+  weak_ptr<A> _aptr;
+  int b;
+};
+
+int main(){
+  shared_ptr<A> aptr(new A(10));
+  shared_ptr<B> bptr(new B(10));
+  cout << aptr.use_count() << endl; //1
+  aptr -> _bptr = bptr;
+  bptr -> _aptr = aptr;
+  cout << aptr.use_count() << endl; //1
+  return 0;
+}
+```
+
+#### 智能指针的实现
+
+基于引用计数的智能指针的实现：
+
+1. 一个模板指针T* ptr，指向实际的对象。
+
+2. 一个引用次数（必须new出来的，不然会多个shared_ptr里面会有不同的引用次数而导致多次delete）。
+
+3. 重载operator*和operator->，使得能像指针一样使用shared_ptr。
+
+4. 重载copy constructor，使其引用次数加一。
+
+5. 重载operator=，如果原来的shared_ptr已经有对象，则让其引用次数减一并判断引用是否为零（是否调用delete），然后将新的对象引用次数加一。
+
+6. 重载析构函数，使引用次数减一并判断引用是否为零（是否调用delete）。
+
+```c++
+#include <iostream>
+
+using namespace std;
+
+template <typename T>
+class smart_ptr{
+public:
+    smart_ptr(T* p = nullptr):_ptr(p){
+      if(_ptr){
+        count = new int(1);
+      }
+      else{
+        count = new int(0);
+      }
+      cout << "Constructor is called!" << endl;
+    }
+    smart_ptr(const smart_ptr<T>& other){
+      if(this->_ptr != other._ptr){
+        this->count = other.count;
+        this->_ptr = other._ptr;
+        (*this->count)++;
+      }
+      cout << "Copy constructor is called!" << endl;
+    }
+    T* operator->(){return _ptr;}
+    T& operator*(){return *_ptr;}
+    smart_ptr<T>& operator=(const smart_ptr<T>& other){
+      if(this->_ptr == other._ptr){
+        return *this;
+      }
+      if(this->_ptr){
+        if(0 == --*this->count){ //将左操作数对象的引用计数减1，若该对象的引用计数减至0，则删除该对象
+        	delete count;
+        	delete _ptr;
+        	count = nullptr;
+        	_ptr = nullptr;
+      	}
+      }
+      this->_ptr = other._ptr;
+      this->count = other.count;
+      (*this->count)++;
+      cout << "Assignment operator overloaded is called!" << endl;
+      return *this;
+    }
+    ~smart_ptr(){
+      if(--*count == 0){
+        delete count;
+        delete _ptr;
+        count = nullptr;
+        _ptr = nullptr;
+        cout << "Destructor is called!" << endl;
+      }
+    }
+    int get_Ref(){
+        return *count;
+    }
+private:
+    int* count; //相同指针共同维护一个引用计数，所以使用指针实现引用计数
+    T* _ptr;
+};
+```
+
+测试程序：
+
+```c++
+#include <iostream>
+#include "smartptr.h"
+
+using namespace std;
+
+int main(){
+  smart_ptr<int> p1(new int(0));
+  cout << p1.get_Ref() << endl;
+  p1 = p1;
+  cout << p1.get_Ref() << endl;
+  smart_ptr<int> p2(p1);
+  cout << p2.get_Ref() << endl;
+  smart_ptr<int> p3(new int(1));
+  cout << p3.get_Ref() << endl;
+  p3 = p1;
+  cout << p3.get_Ref() << endl;
+  return 0;
+}
+```
+
+### 野指针和悬空指针
+
+都是指向无效内存区域，访问行为会未定义，野指针是指针变量未初始化，在使用的时候编译器就会报错，产生非法内存访问，悬空指针是指针释放未置空，继续使用指针行为不可预料，设置为空再使用，编译器会直接报错。
+
+### 强制转换
+
+* **static_cast**
+  **用于各种隐式转换**，具体的说，就是用户各种基本数据类型之间的转换，比如把int换成char，float换成int等，以及派生类（子类）的指针转换成基类（父类）指针的转换。
+  * 它**没有运行时类型检查**，所以**有安全隐患**。
+  * **在派生类指针转换到基类指针时（上行转换），是没有任何问题的，在基类指针转换到派生类指针时（下行转换），会有安全问题。**
+  * static_cast**不能转换const，volatile等属性**。
+* **dynamic_cast**
+  * **用于动态类型转换**，具体的说，就是**在基类指针到派生类指针转换（下行转换）比较安全**，而**派生类到基类指针的转换（上行转换）不太安全**。
+  * dynamic_cast**能够提供运行时类型检查**，**只用于含有虚函数的类**。
+  * 如果下行转换是安全的（基类指针或者引用指向一个派生类对象），dynamic_cast会传回适当转型过的指针，如果下行转换不安全（基类指针或者引用没有指向一个派生类对象），dynamic_cast会传回空指针。
+* **const_cast**
+  **用于去除const常量或volatile属性**，使其可以修改 ，也就是说，原本定义为const的变量在定义后就不能进行修改的，但是使用const_cast操作之后，可以通过这个指针或变量进行修改。
+* **reinterpret_cast**
+  几乎什么都可以**强制转换**，用在任意的指针之间的转换，引用之间的转换，指针和足够大的int型之间的转换，整数到指针的转换等，**不能丢掉 const，volatile特性**，但是**不够安全**。
+
+```c++
+#include <iostream>
+
+using namespace std;
+
+class Base{
+public:
+  Base():b(1){}
+  virtual void fun(){}
+private:
+  int b;
+};
+
+class Son:public Base{
+public:
+  Son():d(2){}
+private:
+  int d;
+};
+
+int main(){
+  int n = 97;
+  
+  int *p = &n;
+  //以下两者效果相同
+  char *c = reinterpret_cast<char*> (p);
+  char *c2 = (char*)(p);
+  cout << "reinterpret_cast输出：" << *c2 << endl;
+  
+  const int *p2 = &n;
+  int *p3 = const_cast<int*>(p2);
+  *p3 = 100;
+  cout << "const_cast输出：" << *p3 << endl;
+  
+  Base* b1 = new Son;
+  Base* b2 = new Base;
+  
+  Son* s1 = static_cast<Son*>(b1); //同类型转换
+  Son* s2 = static_cast<Son*>(b2); //下行转换，不安全
+  cout << "static_cast输出：" << endl;
+  cout << s1->d << endl;
+  cout << s2->d << endl; //下行转换，原先父对象没有d成员，输出随机值
+  
+  Son* s3 = dynamic_cast<Son*>(b1); //同类型转换
+  Son* s4 = dynamic_cast<Son*>(b2); //下行转换，安全
+  cout << "dynamic_cast输出：" << endl;
+  cout << s3->d << endl;
+  if(s4 == nullptr){
+    cout << "s4指针为nullptr" << endl;
+  }
+  else{
+    cout << s4->d << endl;
+  }
+  return 0;
+}
+//输出结果
+//reinterpret_cast输出：a
+//const_cast输出：100
+//static_cast输出：
+//2
+//-33683019
+//dynamic_cast输出：
+//2
+//s4指针为nullptr
+```
+
+### RTTI
+
+**运行时类型检查**，在C++层面主要体现在dynamic_cast和typeid。
+
+- dynamic_cast 动态类型转换。
+
+- typeid 运算符允许在运行时确定对象的类型，获取对象的实际类型。
+
+### RAII
+
+RAII全称是“Resource Acquisition is Initialization”，直译过来是**“资源获取即初始化”**。
+
+- 在构造函数中申请分配资源，在析构函数中释放资源。因为C++的语言机制保证了，当一个对象创建的时候，自动调用构造函数，当对象超出作用域的时候会自动调用析构函数。所以在RAII的指导下，我们应该使用类来管理资源，将资源和对象的生命周期绑定。
+- RAII的核心思想是将资源或者状态与对象的生命周期绑定，通过C++的语言机制，实现资源和状态的安全管理,智能指针是RAII最好的例子。
+
+### C++11新特性
+
+#### nullptr和std::nullptr
+
+```c++
+void f(int);
+void f(void*); //函数重载
+f(0); //调用f(int)
+f(NULL); //如果NULL是0，调用f(int)，有歧义
+f(nullptr); //调用f(void*)
+```
+
+使用`nullptr`代替`NULL`和0来代表指针没有指向值，这可以避免把空指针当int而引发错误，如上函数调用的实例，使用`nullptr`不会出现歧义，因为`nullptr`是`std::nullptr_t`类型，C++11以后，`std::nullptr_t`也是基础类型了，可以自己定义变量。
+
+#### auto
+
+```c++
+list<string> c;
+...
+list<string>::iterator ite;
+ite = find(c.begin(),c.end(),target);
+//使用auto可以转换为
+list<string> c;
+...
+auto ite = find(c.begin(),c.end(),target);
+```
+
+C++11之后，可以使用auto自动推导变量和对象的类型，主要用于类型名称长和类型复杂的情况，另外auto还可以自动推导lambda表达式的类型，然后就可以把lambda函数当普通函数使用。
+
+#### decltype
+
+```c++
+map<string,float> coll;
+decltype(coll)::value_type elem;
+//相当于
+map<string,float>::value_type elem;
+
+delctype (f()) sum = x; //并不实际调用函数f()，只是使用f()的返回值当做sum的类型
+delctype (i) sum = x; //i为int类型，为int类型
+delctype ((i)) sum = x; //i为int类型，为int&引用
+```
+
+使用`decltype`关键字，可以让编译器找到一个表达式它的类型，这个很像typeof的功能。
+
+`decltype`的应用有三种：
+
+**（1）用作返回值的类型**
+
+```c++
+template<typename T1, typename T2>
+decltype(x+y) add(T1 x, T2 y); //编译不能通过
+//修改写法
+template<typrname T1, typename T2>
+auto add(T1 x, T2 y)->decltype(x+y);
+```
+
+第一个代码块编译无法通过，因为return表达式所用的对象没有在定义域内（`x`和`y`还没声明），C++11则允许的一种写法是第二个代码块，返回类型用`auto`暂定，但在后面写出，用`-> decltype(x+y)`，`-> decltype(x+y)`与lambda的返回类似。
+
+**（2）元编程**
+
+```c++
+template<typename T>
+void test_decltype(T obj){
+  typedef typename decltype(obj)::iterator iType;
+  //相当于
+  typedef typename T::iterator iType;
+}
+```
+
+用于元编程推导实参的类型，由于加了`::iterator`，传入的实参必须是容器，传入复数会报错，这就是模板的半成品特性。
+
+**（3）lambda函数的类型**
+
+```c++
+auto cmp = [](const Person& p1, const Person& p2){
+  return p1.lastname()<p2.lastname() || (p1.lastname()==p2.lastname() && p1.firstname()<p2.firstname());
+};
+...
+std::set<Person,decltype(cmp)> coll(cmp);
+```
+
+对于lambda函数，很少有人能够写出它的类型，而有时就需要知道它的类型，这时候就可以使用`decltype`来自动推导lambda函数的类型。
+
+#### 范围for语句
+
+多与auto配合使用。
+
+```c++
+string str("somthing");
+for(auto i:str) //对于str中的每个字符，i类型为char
+    cout << c << endl;
+
+for(auto &i:str) //对于若要改变每个字符的值，需要加引用
+    cout << c << endl;
+```
+
+#### 定义双层vector
+
+`vector<vector<int>>(m, vector<int>(n, 0))` 创建m行n列的二维数组，全部初始化为0。
+
+#### Lambdas
+
+```c++
+//使用方法
+auto l = []{
+  std::cout << "hello lambda" << std::endl;
+};
+...
+l(); //prints "hello lambda"
+```
+
+C++11介绍了lambdas（可以说是匿名函数或仿函数），允许定义在声明和表达式中，作为一种内联函数，最简单的lambda通过一个`[]{statements};`表示，可以直接加()运行，或者使用`auto l = []{statements};`，`l`则代表lambda函数，可以在后面进行调用。
+
+**lambda的通用格式**
+
+![Lambda函数的通用格式](/Users/wushengna/manual/img/img-post/Lambda函数的通用格式.png)
+
+这是lambda函数的通用格式，**中括号`[]`**内部是可以抓取外面的非静态对象进行函数内部的使用，有以值`[x]`进行抓取和以引用`[&x]`进行抓取，如果只抓取部分对象，可以进行指定，这种写法也可以省略，比如只写`[=]`代表所有对象都是传值，至于用了哪些对象，在lambda函数里面直接写就好了，再比如`[=, &y]`表示对`y`传引用，其他都是传值，但是不建议省略写，因为可读性比较差，所以以后用的时候还是要把每个使用的变量都写上，**小括号`()`**里面则是可以接受函数参数，**`mutable`**是指以值进行抓取的对象是否可变，可变就需要加上，否则会报错，**`throwSepc`**是指这个函数可以不可以抛出异常，**`->retType`**是指lambda函数的返回类型，这三个部分都是可选的，如果都不写，甚至可以省略前面的小括号，但只要写一个，前面的小括号就必须写，对于返回类型来说，如果不写，编译器会对返回值自动进行类型推导，**大括号`{}`**内部则是函数的主体。
+
+```c++
+//类的形式
+class LambdaFunctor{
+public:
+  LambdaFunctor(int a, int b):m_a(a),m_b(b){}
+  bool operator()(int n)const{
+    return m_a < n && n < m_b;
+  }
+private:
+  int m_a;
+  int m_b;
+};
+v.erase(remove_if(v.begin(),v.end(),LambdaFunctor(x,y)),v.end());
+//lambda函数的形式
+vector<int> vi{5,28,50,83,70,590,245,59,24};
+int x = 30;
+int y = 100;
+vi.erase(remove_if(vi.begin(),vi.end(),[x,y](int n){return x < n && n < y;}),vi.end());
+for(auto i:vi){
+  cout << i << ' '; //5 28 590 245 24
+}
+cout << endl;
+```
+
+lambda函数的使用方法，函数对象就是指重载了函数调用运算符的类，可以封装代码和数据来自定义标准库的行为，但需要写出函数对象需要写出整个类，其定义和使用的地方是分开的，而且它们不是`inline`的，效率会低一些（算法效率还是最重要的），而lambda函数要简短许多，功能一样很直观。
+
+#### 智能指针
+
+- shared_ptr
+- weak_ptr
+- unique_ptr
+
+#### 右值引用
+
+```c++
+int a = 9;
+int b = 4;
+
+a = b; //a是左值
+b = a; //b是左值
+a = a + b;
+
+//!a + b = 42 //a + b是右值
+```
+
+**右值引用**是为了**减少不必要的拷贝使能完美转交**而引入的新的引用类型，当右边的赋值类型是一个右值，左边的对象可以从右边的对象中偷取资源而不是重新分配拷贝，这个偷取的过程叫做移动语义。
+
+`a+b`和临时对象就是右值，**右值**只能出现在右边，不能取地址，且没有名字，右值由将亡值和纯右值组成，将亡值如`a+b`赋给`a`后就死掉，临时对象也是一样，纯右值指的是`2`，`'a'`，`true`等，**左值**则可以两边都出现，可以取地址，且有名字。
+
+![右值引用](/Users/wushengna/manual/img/img-post/右值引用.png)
+
+上述的是测试程序，在`vector`尾端插入`Mystring`的临时对象，调用的`vector`需要实现带有右值插入的版本即`insert(..., &&x)`，`insert`函数移动元素需要调用`MyString`的构造函数，调用的就是移动构造函数，除了拷贝构造函数需要对应的移动构造函数以外，还有拷贝赋值函数也需要对应的移动赋值函数，`noexcept`是为了让编译器知道构造和析构不会抛出异常。
+
+关于copy和move的区别，可以看到copy中的数据是有两份的，其中一份是拷贝过来的，即深拷贝，而move操作的数据是只有一份的，原来可能指向临时对象，现在指向搬移后的对象，原来的对象会设置为空指针，即浅拷贝，要保证原来的对象不再使用，这才安全，调用`std:move()`可以得到一个左值的右值引用。
+
+```c++
+//不完美的转交
+void process(int &i){
+  cout << "process(int&):" << i << endl;
+}
+void process(int &&i){
+  cout << "process(int&&):" << i << endl;
+}
+
+void forward(int &&i){
+  cout << "forward(int&&)" << i << " ";
+  process(i);
+}
+
+forward(2); //2是右值，调用的是forward(int&& i)函数，但在forward(int&& i)函数里面使用i，i就会变为左值，从而调用process(int& i)函数，引发错误
+```
+
+不完美转交会因为转交函数的错误而使得不能调用对应函数，**完美转交**可以允许将有任意个参数的函数模板，透明地转发给另一个函数，其中参数的本质（可修改性，const，左值，右值）都会在转发过程中保留下来，使用的是`std::forward`模板函数。
+
+#### 移动构造函数和移动赋值函数的实现
+
+![移动构造函数和移动赋值函数1](/Users/wushengna/manual/img/img-post/移动构造函数和移动赋值函数1.png)
+
+![移动构造函数和移动赋值函数2](/Users/wushengna/manual/img/img-post/移动构造函数和移动赋值函数2.png)
+
+以上是带有移动构造函数和移动赋值函数的`Mystring`实现，拷贝构造函数和拷贝赋值函数需要分配新的空间，调用`memcpy`函数进行拷贝，移动构造函数和移动赋值函数本质上都是浅拷贝，对指针和长度直接赋值，在完成以后要把原来对象与资源的联系切断，即将内部长度设为0，指针置为NULL，如果不将指针置为NULL，在函数结束之时会调用析构函数释放指针，而此时两个指针指向一个区域，移动之后的指针也会受到影响，所以要把指针置为NULL，而在析构函数中，释放资源之前要先判断指针是否为NULL，当指针为NULL时，不进行`delete`操作。
+
+#### 仿函数
+
+仿函数（functor）又称之为函数对象（function object），其实就是**重载了operator()操作符的struct或class**，是**一个能行使函数功能的类**，它使一个类的使用看上去像一个函数，这个类就有了类似函数的行为，就是一个仿函数类。

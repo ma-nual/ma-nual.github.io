@@ -1,6 +1,6 @@
 ### string
 
-string类的底层是一个字符串指针
+string类的底层是一个字符串指针。
 
 ```c++
 #include <iostream>
@@ -134,9 +134,9 @@ vector是线性容器，有一块连续的存储空间，可以自动增长或�
 
 **vector的内存管理与效率**
 
-- 使用reserve()函数提前设定容量大小
+- 使用reserve()函数提前设定容量大小。
   - 对于vector容器来说，如果有大量的数据需要进行push_back，应当使用reserve()函数提前设定其容量大小，否则会出现许多次容量扩充操作，导致效率低下。
-- 使用“交换技巧”来修整vector过剩空间/内存
+- 使用“交换技巧”来修整vector过剩空间/内存。
   - `vector<int>(ivec).swap(ivec);`，表达式vector<int>(ivec)表示建立一个临时vector，它是ivec的一份拷贝。但是vector的拷贝构造函数只分配拷贝的元素需要的内存，所以这个临时vector没有多余的容量。然后临时vector和ivec交换数据完成，但ivec只有临时变量的修整过的容量，而这个临时变量则持有了曾经在ivec中的没用到的过剩容量。在这个语句结尾处，临时 vector被销毁，以释放以前ivec使用的内存，收缩到合适的大小。
 
 **vector的扩容机制**
@@ -195,7 +195,7 @@ map的插入有3种方式：用insert函数插入pair数据，用insert函数插
 - 如果一个结点是红的，那么它的两个儿子都是黑的;
 - 对于任意结点而言，其到叶结点树尾端NIL指针的每条路径都包含相同数目的黑结点。
 
-### 函数对象
+### 函数对象（仿函数）
 
 函数对象是调用操作符的类，其对象常称为函数对象（function object），它们是行为类似函数的对象。表现出一个函数的特征，就是通过“对象名+（参数列表 ）” 的方式使用一个类，其实质是对operator()操作符的重载。
 
@@ -261,4 +261,32 @@ STL中的哈希表使用的是拉链法解决哈希表冲突问题。
 
 哈希表中的bucket所维护的list既不是list也不是slist，而是其自己定义的由hashtable_node数据结构组成的linked-list，而bucket聚合体本身使用vector进行存储。哈希表的迭代器只提供前进操作，不提供后退操作。
 
-在哈希表设计bucket的数量上，其内置了28个质数[53，97，19，....，429496729]，在创建哈希表时，会根据存入的元素个数选择大于等于元素个数的质数作为哈希表的容量（vector的长度），其中每个bucket所维护的linked-list长度也等于哈希表的容量。如果插入哈希表的元素个数超过了bucket的容量，就要进行重建table操作，即找出下一个质数，创建新的buckets vector，重新计算元素在新哈希表的位置。
+在哈希表设计bucket的数量上，其内置了28个质数[53，97，19，....，429496729]，在创建哈希表时，会根据存入的元素个数选择大于等于元素个数的质数作为哈希表的容量（vector的长度），其中每个bucket所维护的linked-list长度也等于哈希表的容量。如果插入哈希表的元素个数超过了bucket的容量，就要进行重建table操作，即找出下一个质数（判断n是不是质数的方法：用n除2到sqrt(n)范围内的数），创建新的buckets vector，重新计算元素在新哈希表的位置（注意STL没有直接将数据从旧桶遍历拷贝数据插入到新桶，而是通过指针转换两个桶的地址），通过swap函数将新桶和旧桶交换，销毁新桶。
+
+### STL中的swap函数
+
+- 除了数组，其他容器在交换后本质上是将内存地址进行了交换，而元素本身在内存中的位置是没有变化。
+- swap在交换的时候并不是完全将2个容器的元素互换，而是交换了2个容器内的内存地址。
+
+### vector的iterator，const_iterator和const iterator
+
+- 三种的区别
+  - iterator，可遍历，可改变所指元素。
+  - const_iterator，可遍历，不可改变所指元素。
+  - const iterator，不可遍历，可改变所指元素。
+- const_iterator转iterator，iterator不能转const_iterator
+  - const_iterator 主要是 **在容器被定义成常量、或者非常量容器但不想改变元素值的情况** 下使用的，而且容器被定义成常量之后，它返回的迭代器只能是const_iterator。
+  - 有些容器成员函数只接受iterator作为参数，而不是const_iterator。那么，如果你只有一const_iterator，在它所指向的容器位置上插入新元素的方式：
+    - const_iterator转iterator。
+    - 强制转换的函数会报错，只能通过 `advance(a, distance(a, b));` 其中，distance用于取得两个迭代器之间的距离，advance用于将一个迭代器移动指定的距离。
+    - 如果a是iterator，b是const_iterator，distance会报错，可以显式的指明distance调用的模板参数类型，从而避免编译器自己得出它们的类型。
+
+```c++
+typedef deque<int> IntDeque;
+typedef IntDeque::iterator iter;
+typedef IntDeque::const_iterator ConstIter;
+IntDeque d;
+ConstIter ci;
+Iter i(d.begin());
+advance(i,distance<ConstIter>(i,ci)); 
+```
