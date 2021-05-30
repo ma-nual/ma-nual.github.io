@@ -1,6 +1,6 @@
 ---
 layout:     post
-published:  true
+published:  false
 title:      "Hello 2015"
 subtitle:   " \"Hello World, Hello Blog\""
 date:       2015-01-29 12:00:00
@@ -74,5 +74,4 @@ Theme 的 CSS 是基于 Bootstrap 定制的，看得不爽的地方直接在 Les
 如果你恰好逛到了这里，希望你也能喜欢这个博客主题。
 
 —— Hux 后记于 2015.10
-
 
