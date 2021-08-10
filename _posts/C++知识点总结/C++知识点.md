@@ -77,7 +77,7 @@ const char arr[] = "hello"; //这里hello本来是在栈上的，但是编译器
 const char *arr2 = "hello"; //字符串hello保存在常量区，const本来是修饰arr2指向的值不能通过arr2去修改，但是字符串hello在常量区，本来就不能改变，所以加不加const效果都一样
 ```
 
-### 函数指针与指针函数
+### 函数指针与指针函数（1）
 
 **含义：**
 
@@ -409,8 +409,8 @@ int main() {
 
 ### 调用构造函数的方式（1）
 
-- 栈上调用：`A a`
-- 堆上调用：`A* a = new A()`
+- 栈上调用：`A a;`
+- 堆上调用：`A* a = new A();`
 
 ### 初始化列表的好处和使用条件（1）
 
@@ -1012,8 +1012,8 @@ malloc和calloc间的主要区别在于后者在返回指向内存的指针之�
 ### new，operator new和placement new的区别（1）
 
 - new：不能被重载，先调用operator new分配内存，然后调用构造函数初始化那段内存，最后返回相应指针。
-- operator new：要实现不同的内存分配行为，应该重载operator new，而不是new，operator new是可以重载的，如果类中没有重载operator new，那么调用的就是全局的::operator new来完成堆的分配
-- placement new：只是operator new重载的一个版本，并不分配内存，只是返回指向已经分配好的某段内存的一个指针，因此不能删除它，但需要调用对象的析构函数。使用placement new构造对象是在一个预先准备好了的内存缓冲区中进行，不需要查找内存，内存分配的时间是常数，具有较高的效率；而且不会出现在程序运行中途出现内存不足的异常。
+- operator new：要实现不同的内存分配行为，应该重载operator new，而不是new，operator new是可以重载的，如果类中没有重载operator new，那么调用的就是全局的::operator new来完成堆的分配。
+- placement new：只是operator new重载的一个版本，并不分配内存，只是返回指向已经分配好的某段内存的一个指针，因此不能删除它，但需要调用对象的析构函数。使用placement new构造对象是在一个预先准备好了的内存缓冲区中进行，不需要查找内存，内存分配的时间是常数，具有较高的效率；而且不会出现在程序运行中途内存不足的异常。
 
 ### delete和delete\[\]的区别
 
@@ -1052,7 +1052,7 @@ malloc和calloc间的主要区别在于后者在返回指向内存的指针之�
 
 - python是一种脚本语言，是解释执行的，而C++是编译语言，编译后需要在特定平台运行，python可以很方便的跨平台，但是效率没有C++高。
 - python使用缩进来区分不同的代码块，C++使用花括号来区分。
-- C++中需要事先定义变量的类型，而python不需要，python的基本数据类型只有数字，布尔值，字符串，列表，元组等等。
+- C++中需要事先定义变量的类型，而python不需要，python的基本数据类型只有数字，布尔值，字符串，列表，元组等。
 - python的库函数比C++的多，调用起来很方便。
 
 ### C++的调用惯例
@@ -1086,7 +1086,7 @@ malloc和calloc间的主要区别在于后者在返回指向内存的指针之�
 - **不可优化性：**volatile关键字是一种类型修饰符，用它声明的类型变量表示不可以被某些编译器未知的因素（操作系统、硬件、其它线程等）更改，所以使用volatile**告诉编译器不应对这样的对象进行优化**。
 - **易变性：**volatile关键字声明的变量，**每次访问时都必须从内存中取出值**（没有被volatile修饰的变量，可能由于编译器的优化，从 CPU 寄存器中取值）。
 
-### mutable
+### mutable（1）
 
 mutable是为了突破const的限制而设置的，被**mutable修饰的变量，将永远处于可变的状态，即使在一个const函数中**。const关键字修饰的函数的一个重要作用就是为了能够保护类中的成员变量，即该函数可以使用类中的所有成员变量，但是不能修改他们的值，然而在某些特殊情况下，我们还是需要在const函数中修改类的某些成员变量，因为即使修改了也不会对类造成多少影响，而且我只想修改某个成员变量，其余成员变量仍然希望被const保护，可以使用mutable修饰变量，需要注意的是mutable不能修饰const 和 static 类型的变量。
 
@@ -1200,7 +1200,7 @@ class aaa
 - 内联函数，需要展开，不存在函数地址，不会写在虚函数表里。
 - inline virtual 唯一可以内联的时候是：**编译器知道所调用的对象是哪个类**（如 Base::who()），这只有在编译器具有实际对象而不是对象的指针或引用时才会发生。
 
-### #define和内联函数的区别（1）
+### #define和内联函数的区别（2）
 
 - 内联函数**在运行时可调试**，而宏定义不可以;
 - 编译器会对内联函数的参数类型做**安全检查或自动类型转换**（同普通函数），而宏定义没有安全检查;
@@ -1335,7 +1335,7 @@ const int int::operator++(int)
 
 同名成员和非静态成员基本一致，同样可以被子类继承，但**静态成员可以通过类名直接访问，不需要创建对象。**
 
-### 多继承和菱形继承
+### 多继承和菱形继承（1）
 
 #### 多继承
 
@@ -1908,35 +1908,33 @@ std::set<Person,decltype(cmp)> coll(cmp);
 
 对于lambda函数，很少有人能够写出它的类型，而有时就需要知道它的类型，这时候就可以使用`decltype`来自动推导lambda函数的类型。
 
-#### 变长参数模板
+#### Variadic Templates（可变模板参数）
 
-允许任意个数，任意类别的模板参数，不必在定义时将参数的个数固定。长参数模板中，变长参数包无法如同一般参数在类或函数中使用； 因此典型的手法是以递归的方法取出可用参数。
+允许任意个数，任意类别的模板参数，不必在定义时将参数的个数固定。长参数模板中，变长参数包无法如同一般参数在类或函数中使用； 因此典型的手法是以递归的方法取出可用参数，在可变模板参数内部可以使用`sizeof...(args)`得到实参的个数。
 
 ```c++
-class CustomerHash{
-public:
-    std::size_t operator() (const Customer& c) const {
-        return hash_val(c.fname, c.lname, c.no);
-    }
-};
- 
-template <typename T, typename... Types>
-inline void hash_val(size_t& seed, const T& val, const Types&... args){
-    hash_combine(seed, val);
-    hash_val(seed, args);
+//递归终结条件函数
+void print()
+{
+
 }
- 
-template <typename... Types>
-inline size_t hash_val(const Types&... args){
-    size_t seed = 0;
-    hash_val(seed, args...);
-    return seed;
+
+//使用递归实现打印
+template <typename T, typename... Types>                //这里的...是关键字的一部分
+void print(const T& firstArg, const Types&... args)     //这里的...要写在自定义类型Types后面
+{
+  cout << firstArg << endl;
+  print(args...);                                     //这里的...要写在变量args后面，代表args的所有参数
 }
- 
-template <typename T>
-inline void hash_val(size_t& seed, const T& val){
-    hash_conbine(seed, val);
-}
+
+//输入
+//print(7.5,"hello",bitset<16>(377),42);
+
+//输出
+//7.5
+//hello
+//0000000101111001
+//42
 ```
 
 #### 范围for语句
@@ -2056,6 +2054,23 @@ forward(2); //2是右值，调用的是forward(int&& i)函数，但在forward(in
 ![移动构造函数和移动赋值函数2](/Users/wushengna/manual/img/img-post/移动构造函数和移动赋值函数2.png)
 
 以上是带有移动构造函数和移动赋值函数的`Mystring`实现，拷贝构造函数和拷贝赋值函数需要分配新的空间，调用`memcpy`函数进行拷贝，移动构造函数和移动赋值函数本质上都是浅拷贝，对指针和长度直接赋值，在完成以后要把原来对象与资源的联系切断，即将内部长度设为0，指针置为NULL，如果不将指针置为NULL，在函数结束之时会调用析构函数释放指针，而此时两个指针指向一个区域，移动之后的指针也会受到影响，所以要把指针置为NULL，而在析构函数中，释放资源之前要先判断指针是否为NULL，当指针为NULL时，不进行`delete`操作。
+
+#### lock_guard和unique_lock
+
+**lock_guard**是一个互斥量包装程序，它提供了一种方便的RAII风格的机制来在作用域块的持续时间内拥有一个互斥量，创建lock_guard对象时，它将尝试获取提供给它的互斥锁的所有权，当控制流离开lock_guard对象的作用域时，lock_guard析构并释放互斥量。
+
+- 创建即加锁，作用域结束自动析构并解锁，无需手工解锁。
+- 不能中途解锁，必须等作用域结束才解锁。
+- 不能复制。
+
+**unique_lock**是一个通用的互斥量锁定包装器，它允许延迟锁定，限时深度锁定，递归锁定，锁定所有权的转移以及与条件变量一起使用，unique_lock 是 lock_guard 的升级加强版，它具有 lock_guard 的所有功能，同时又具有其他很多方法，使用起来更强灵活方便，能够应对更复杂的锁定需要，但是占用空间也相对更大一点且相对更慢一点。
+
+- 创建时可以不锁定（通过指定第二个参数为std::defer_lock），而在需要时再锁定。
+- 可以随时加锁解锁。
+- 作用域规则同 lock_grard，析构时自动释放锁。
+- 不可复制，可移动。
+- 条件变量需要该类型的锁作为参数（此时必须使用unique_lock）。
+- 需要使用锁的时候，首先考虑使用 lock_guard，因为它更简单。
 
 #### 函数对象（仿函数）
 
